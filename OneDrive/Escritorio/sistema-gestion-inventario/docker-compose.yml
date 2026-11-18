@@ -1,12 +1,11 @@
 services:
   db:
     image: postgres:16-alpine
-    container_name: inventario_postgres
-    restart: unless-stopped
+    container_name: inventario_db
     environment:
-      POSTGRES_USER: inventario_user
-      POSTGRES_PASSWORD: inventario_pass
-      POSTGRES_DB: inventario_db
+      POSTGRES_USER: ${POSTGRES_USER:-inventario_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-inventario_pass}
+      POSTGRES_DB: ${POSTGRES_DB:-inventario_db}
     ports:
       - "5432:5432"
     volumes:
@@ -17,19 +16,33 @@ services:
       timeout: 5s
       retries: 5
 
-  api:
+  backend:
     build:
       context: ./backend
       dockerfile: Dockerfile
     container_name: inventario_api
-    restart: unless-stopped
-    env_file:
-      - .env.example
-    ports:
-      - "8000:8000"
     depends_on:
       db:
         condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql+psycopg://inventario_user:inventario_passdb:5432/inventario_db
+      USE_MOCK_DB: "False"
+      SECRET_KEY: ${SECRET_KEY:-clave_secreta_desarrollo_local_2026}
+      CORS_ORIGINS: '["http://localhost:5173","http://127.0.0.1:5173"]'
+    ports:
+      - "8000:8000"
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: inventario_web
+    depends_on:
+      - backend
+    environment:
+      VITE_API_URL: http://localhost:8000
+    ports:
+      - "5173:5173"
 
 volumes:
   postgres_data:
